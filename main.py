@@ -27,7 +27,7 @@ def get_full_frames(anim_frames, specs):
     frames = []
     for anim_frame in anim_frames:
         # padd the frame if needed
-        anim_frame = [line.ljust(longest_line_length) for line in anim_frame]
+        anim_frame = [line.center(longest_line_length) for line in anim_frame]
         frame = []
         for i in range(max(len(anim_frame), len(specs))):
             anim_line = anim_frame[i] if i < len(anim_frame) else " " * longest_line_length
