@@ -58,6 +58,7 @@ def main():
             print("\033[H\033[J", end="")  # Clear screen if standalone
         print_matrix(matrix)
         print()  # Print a blank line as a frame separator
+        sys.stdout.flush()
         matrix = update_snow_matrix(matrix, width, height)
         t.sleep(1 / fps)
 

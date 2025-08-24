@@ -1,12 +1,14 @@
 import subprocess
 import time as t
+import time
 import sys
+import os
 
-
-def get_neofetch_data():
-    neofetch_command = ["neofetch", "--off"]
-    neofetch_data = subprocess.run(neofetch_command, capture_output=True, text=True)
-    return neofetch_data.stdout.strip().splitlines()
+def get_fast_fetch_data():
+    fast_fetch_command = ["fastfetch", "-l", "none"]
+    fast_fetch_data = subprocess.run(fast_fetch_command, capture_output=True, text=True)
+    result = fast_fetch_data.stdout.strip().splitlines()
+    return result
 
 
 def format_frame(anim_frame, specs):
@@ -33,8 +35,11 @@ def get_frame(provider):
 
 
 def launch_frame_provider(script_name, params=[]):
-    command = [sys.executable, script_name] + params
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, text=True)
+    if script_name.endswith(".py") or os.path.isfile(script_name):
+        command = [sys.executable, script_name] + params
+    else:
+        command = [script_name] + params
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, text=True, bufsize=1)
     return process
 
 
@@ -47,7 +52,7 @@ def main():
     except ValueError:
         print("FPS must be a number.")
         sys.exit(1)
-    specs = get_neofetch_data()
+    specs = get_fast_fetch_data()
     script_name = sys.argv[2]
     params = sys.argv[3:]
     provider = launch_frame_provider(script_name, params)
