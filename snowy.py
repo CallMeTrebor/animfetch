@@ -54,6 +54,7 @@ def main():
     matrix = create_snow_matrix(width, height)
     while True:
         print_matrix(matrix)
+        print()  # Print a blank line as a frame separator
         matrix = update_snow_matrix(matrix, width, height)
         t.sleep(1 / fps)
 
