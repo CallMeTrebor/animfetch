@@ -52,7 +52,10 @@ def main():
     fps = float(sys.argv[3])
 
     matrix = create_snow_matrix(width, height)
+    is_tty = sys.stdout.isatty()
     while True:
+        if is_tty:
+            print("\033[H\033[J", end="")  # Clear screen if standalone
         print_matrix(matrix)
         print()  # Print a blank line as a frame separator
         matrix = update_snow_matrix(matrix, width, height)
