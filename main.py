@@ -1,8 +1,8 @@
 import subprocess
 import time as t
-import time
 import sys
 import os
+
 
 def get_fast_fetch_data():
     fast_fetch_command = ["fastfetch", "-l", "none"]
