@@ -7,9 +7,9 @@ import random
 
 class State:
     def __init__(self):
-        self.WIDTH = 80
-        self.HEIGHT = 24
-        self.FPS = 60
+        self.WIDTH: int = 80
+        self.HEIGHT: int = 24
+        self.FPS: float = 60
         self.STAR_DATA = []
         self.PLANET_DATA = []
 
@@ -17,12 +17,12 @@ class State:
 STATE = State()
 
 
-def update_planets(frame, delta_time=0):
+def update_planets(frame, delta_time: float = 0):
 
     return frame
 
 
-def update_stars(frame, delta_time=0):
+def update_stars(frame, delta_time: float = 0):
     max_stars = floor((STATE.WIDTH * STATE.HEIGHT) * 0.02)
 
     # add stars if we have less than max_stars
@@ -76,7 +76,7 @@ def update_stars(frame, delta_time=0):
     return frame
 
 
-def update_state(frame, delta_time=0):
+def update_state(frame, delta_time: float = 0):
     return update_planets(update_stars(frame, delta_time), delta_time)
 
 
