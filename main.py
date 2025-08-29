@@ -5,7 +5,7 @@ import os
 
 
 def get_fast_fetch_data():
-    fast_fetch_command = ["fastfetch", "-l", "none"]
+    fast_fetch_command = ["fastfetch", "-l", "none", "--pipe", "false"]
     fast_fetch_data = subprocess.run(fast_fetch_command, capture_output=True, text=True)
     result = fast_fetch_data.stdout.strip().splitlines()
     return result
