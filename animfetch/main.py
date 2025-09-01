@@ -48,7 +48,13 @@ def get_provider_choices():
     return choices
 
 
-@click.command()
+@click.group()
+def cli():
+    """Animfetch CLI"""
+    pass
+
+
+@cli.command()
 @click.option(
     "--fps", default=30, show_default=True, type=float, help="Frames per second"
 )
@@ -69,8 +75,8 @@ def get_provider_choices():
     type=str,
     help="Command to fetch system information",
 )
-def cli(fps, width, height, provider, fetch_command):
-    """Animfetch CLI using selected provider."""
+def run(fps, width, height, provider, fetch_command):
+    """Run the animation with the selected provider."""
     fps = constrain(fps, 0, 1000)
     specs = get_fetch_data(fetch_command)
 
@@ -107,6 +113,25 @@ def cli(fps, width, height, provider, fetch_command):
             frame = format_frame(anim_frame, specs)
             print("\033[H\033[J", end="")
             print("\n".join(frame))
+
+
+@cli.command()
+def ls():
+    """List all providers with their descriptions."""
+    choices = get_provider_choices()
+    click.echo("\n=== Provider List ===\n")
+    for provider_name in choices:
+        try:
+            provider_module = __import__(
+                f"animfetch.providers.{provider_name}", fromlist=["Provider"]
+            )
+            ProviderClass = getattr(
+                provider_module, f"{provider_name.capitalize()}Provider"
+            )
+            desc = ProviderClass(1, 1, 1).get_description()
+        except Exception as e:
+            desc = f"(Error: {e})"
+        click.echo(click.style(provider_name, bold=True) + f": {desc}")
 
 
 if __name__ == "__main__":
