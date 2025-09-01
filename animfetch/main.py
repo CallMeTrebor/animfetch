@@ -48,10 +48,16 @@ def get_provider_choices():
     return choices
 
 
-@click.group()
-def cli():
+@click.group(invoke_without_command=True)
+@click.pass_context
+def cli(ctx):
     """Animfetch CLI"""
-    pass
+    # If no subcommand is provided, default to 'run'
+    if ctx.invoked_subcommand is None:
+        # Remove the first argument (the script/entry point)
+        # and call run with default options
+        # Use Click's Context to invoke the run command
+        ctx.invoke(run)
 
 
 @cli.command()
@@ -135,4 +141,10 @@ def ls():
 
 
 if __name__ == "__main__":
+    import sys
+
+    # If no subcommand is provided, default to 'run'
+    if len(sys.argv) == 1 or (len(sys.argv) > 1 and sys.argv[1] not in cli.commands):
+        # Remove script name from argv and call run with remaining args
+        sys.argv.insert(1, "run")
     cli()
