@@ -97,7 +97,3 @@ That's it — the CLI will discover the new file automatically and list it via `
 
 - The CLI defaults to using `fastfetch` to fetch system specs. If you don't have `fastfetch`, either install it or pass another command via `--fetch-command`.
 - Providers should be named with a `.py` filename and not start with `__` to be auto-discovered.
-
-## License
-
-
