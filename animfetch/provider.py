@@ -18,9 +18,5 @@ class Provider(ABC):
         pass
 
     @abstractmethod
-    def clear(self):
-        pass
-
-    @abstractmethod
     def get_description(self) -> str:
         pass

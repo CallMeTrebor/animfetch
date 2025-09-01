@@ -111,9 +111,5 @@ class PlanetsProvider(Provider):
             delta_time,
         )
 
-    def clear(self):
-        if self.is_tty:
-            print("\033[H\033[J", end="")
-
     def get_description(self) -> str:
         return "Planets animation with twinkling stars"

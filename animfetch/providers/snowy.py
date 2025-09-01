@@ -60,10 +60,6 @@ class SnowyProvider(Provider):
     def update_state(self, delta_time=0.0):
         pass
 
-    def clear(self):
-        if self.is_tty:
-            print("\033[H\033[J", end="")
-
     def get_description(self) -> str:
         result = f"Snowy Animation: {self.width}x{self.height} at {self.fps} FPS"
         if not self.is_tty:
