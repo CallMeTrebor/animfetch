@@ -1,0 +1,19 @@
+[project]
+name = "animfetch"
+version = "0.1.0"
+description = "Animated system info fetcher with CLI."
+authors = [
+    { name = "CallMeTrebor" }
+]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "click>=8.0.0"
+]
+
+[project.scripts]
+animfetch = "animfetch.main:cli"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
