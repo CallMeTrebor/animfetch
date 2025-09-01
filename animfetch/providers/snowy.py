@@ -1,20 +1,23 @@
-import subprocess
 import time as t
 import random
 import sys
+from animfetch.provider import Provider
+import argparse
 
 
-def create_snow_matrix(width, height, snowflakes=0.05):
+def create_snow_matrix(width, height, snowflakes_chance=0.05):
     # Initialize matrix with empty spaces
     matrix = [[" " for _ in range(width)] for _ in range(height)]
     # Randomly place snowflakes in the top row
     for x in range(width):
-        if random.random() < snowflakes:
+        if random.random() < snowflakes_chance:
             matrix[0][x] = "*"
     return matrix
 
 
-def update_snow_matrix(matrix, width, height):
+def update_snow_matrix(
+    matrix, width, height, snowflakes_chance=0.05, should_update=True
+):
     # Move snowflakes down by one row
     for y in range(height - 2, -1, -1):
         for x in range(width):
@@ -31,37 +34,38 @@ def update_snow_matrix(matrix, width, height):
             matrix[height - 1][x] = " "
     # Add new snowflakes at the top
     for x in range(width):
-        if random.random() < 0.05:
+        if random.random() < snowflakes_chance:
             if matrix[0][x] == " ":
                 matrix[0][x] = "*"
     return matrix
 
 
-def print_matrix(matrix):
-    for row in matrix:
-        print("".join(row))
+class SnowyProvider(Provider):
+    SNOWFLAKE_CHANCE = 0.05
 
+    def __init__(self, width, height, fps) -> None:
+        super().__init__(width, height, fps)
+        self.matrix = create_snow_matrix(width, height, SnowyProvider.SNOWFLAKE_CHANCE)
+        self.is_tty = sys.stdout.isatty()
 
-def main():
-    # Parse command line arguments
-    if len(sys.argv) != 4:
-        print("Usage: python snowy.py <width> <height> <fps>")
-        return
-    width = int(sys.argv[1])
-    height = int(sys.argv[2])
-    fps = float(sys.argv[3])
+    def get_frame(self) -> list[str] | None:
+        self.matrix = update_snow_matrix(
+            self.matrix,
+            self.width,
+            self.height,
+            SnowyProvider.SNOWFLAKE_CHANCE,
+        )
+        return ["".join(row) for row in self.matrix] + ["\n"]
 
-    matrix = create_snow_matrix(width, height)
-    is_tty = sys.stdout.isatty()
-    while True:
-        if is_tty:
-            print("\033[H\033[J", end="")  # Clear screen if standalone
-        print_matrix(matrix)
-        print()  # Print a blank line as a frame separator
-        sys.stdout.flush()
-        matrix = update_snow_matrix(matrix, width, height)
-        t.sleep(1 / fps)
+    def update_state(self, delta_time=0.0):
+        pass
 
+    def clear(self):
+        if self.is_tty:
+            print("\033[H\033[J", end="")
 
-if __name__ == "__main__":
-    main()
+    def get_description(self) -> str:
+        result = f"Snowy Animation: {self.width}x{self.height} at {self.fps} FPS"
+        if not self.is_tty:
+            result += " (not a TTY, clearing disabled)"
+        return result

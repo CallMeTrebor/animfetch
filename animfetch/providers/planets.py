@@ -1,38 +1,31 @@
-import math
 from math import floor
 import sys
-import time
 import random
 
-
-class State:
-    def __init__(self):
-        self.WIDTH: int = 80
-        self.HEIGHT: int = 24
-        self.FPS: float = 60
-        self.STAR_DATA = []
-        self.PLANET_DATA = []
+from animfetch.provider import Provider
 
 
-STATE = State()
-
-
-def update_planets(frame, delta_time: float = 0):
-
+def update_planets(frame, width, height, planet_data, delta_time: float = 0):
     return frame
 
 
-def update_stars(frame, delta_time: float = 0):
-    max_stars = floor((STATE.WIDTH * STATE.HEIGHT) * 0.02)
+def update_stars(
+    frame,
+    width,
+    height,
+    star_data,
+    delta_time: float = 0,
+):
+    max_stars = floor((width * height) * 0.02)
 
     # add stars if we have less than max_stars
     base_star_gen_rate = 0.07
     star_gen_chance = min(base_star_gen_rate * 1 / (delta_time + base_star_gen_rate), 1)
-    if len(STATE.STAR_DATA) < max_stars and random.random() > star_gen_chance:
-        x = random.randint(0, STATE.WIDTH - 1)
-        y = random.randint(0, STATE.HEIGHT - 1)
+    if len(star_data) < max_stars and random.random() > star_gen_chance:
+        x = random.randint(0, width - 1)
+        y = random.randint(0, height - 1)
         brightness = random.choice([".", "*", "+"])
-        STATE.STAR_DATA.append((x, y, brightness))
+        star_data.append((x, y, brightness))
 
     # update star states with delta_time-scaled probabilities
     # base rates: brighten 0.25/sec, dim 0.5/sec
@@ -42,7 +35,7 @@ def update_stars(frame, delta_time: float = 0):
     dim_chance = min(dim_rate * delta_time, 1.0)
 
     new_star_data = []
-    for data in STATE.STAR_DATA:
+    for data in star_data:
         rand_val = random.random()
         x, y, brightness = data
         updated_data = data
@@ -66,57 +59,55 @@ def update_stars(frame, delta_time: float = 0):
         # Only keep stars that are not "!"
         if updated_data[2] != "!":
             new_star_data.append(updated_data)
-            if 0 <= x < STATE.WIDTH and 0 <= y < STATE.HEIGHT:
+            if 0 <= x < width and 0 <= y < height:
                 frame[y][x] = updated_data[2]
         else:
-            if 0 <= x < STATE.WIDTH and 0 <= y < STATE.HEIGHT:
+            if 0 <= x < width and 0 <= y < height:
                 frame[y][x] = " "
 
-    STATE.STAR_DATA = new_star_data
+    star_data = new_star_data
     return frame
 
 
-def update_state(frame, delta_time: float = 0):
-    return update_planets(update_stars(frame, delta_time), delta_time)
+def update_state(frame, width, height, star_data, planet_data, delta_time: float = 0):
+    return update_planets(
+        update_stars(frame, width, height, star_data, delta_time),
+        width,
+        height,
+        planet_data,
+        delta_time,
+    )
 
 
 def render_frame(frame):
     return [[char for char in line] for line in frame]
 
 
-def parse_args():
-    if len(sys.argv) > 2:
-        try:
-            STATE.WIDTH = int(sys.argv[1])
-            STATE.HEIGHT = int(sys.argv[2])
-        except ValueError:
-            print("Width and height must be integers.")
-            sys.exit(1)
-    if len(sys.argv) > 3:
-        try:
-            STATE.FPS = float(sys.argv[3])
-        except ValueError:
-            print("FPS must be a number.")
-            sys.exit(1)
+class PlanetsProvider(Provider):
 
+    def __init__(self, width, height, fps) -> None:
+        super().__init__(width, height, fps)
+        self.star_data = []
+        self.planet_data = []
 
-def main():
-    parse_args()
-    t0 = time.time()
-    is_tty = sys.stdout.isatty()
-    while True:
-        frame = [[" " for _ in range(STATE.WIDTH)] for _ in range(STATE.HEIGHT)]
-        dt = time.time() - t0
-        t0 = time.time()
-        frame = update_state(frame, dt)
-        rendered_frame = render_frame(frame)
+        self.frame = []
+        self.is_tty = sys.stdout.isatty()
 
-        if is_tty:
+    def get_frame(self) -> list[str] | None:
+        rendered_frame = render_frame(self.frame)
+        return ["".join(line) for line in rendered_frame] + ["\n"]
+
+    def update_state(self, delta_time: float = 0):
+        self.frame = [[" " for _ in range(self.width)] for _ in range(self.height)]
+        self.frame = update_state(
+            self.frame,
+            self.width,
+            self.height,
+            self.star_data,
+            self.planet_data,
+            delta_time,
+        )
+
+    def clear(self):
+        if self.is_tty:
             print("\033[H\033[J", end="")
-        for line in rendered_frame:
-            print("".join(line))
-        print(flush=True)
-        time.sleep(1 / STATE.FPS)
-
-
-main()

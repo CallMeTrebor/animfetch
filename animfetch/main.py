@@ -2,6 +2,15 @@ import subprocess
 import time as t
 import sys
 import os
+import click
+
+try:
+    from animfetch.provider import Provider
+    from animfetch.providers.snowy import SnowyProvider
+except ImportError:
+    # Allow running as script from project root
+    from provider import Provider
+    from providers.snowy import SnowyProvider
 
 
 def get_fast_fetch_data():
@@ -34,38 +43,39 @@ def get_frame(provider):
     return None
 
 
-def launch_frame_provider(script_name, params=[]):
-    if script_name.endswith(".py") or os.path.isfile(script_name):
-        command = [sys.executable, script_name] + params
-    else:
-        command = [script_name] + params
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, text=True, bufsize=1)
-    return process
+def constrain(value, min_value, max_value):
+    return max(min_value, min(max_value, value))
 
 
-def main():
-    if len(sys.argv) < 3:
-        print("Usage: python main.py <fps> <script> [script_args...]")
-        sys.exit(1)
-    try:
-        fps = float(sys.argv[1])
-    except ValueError:
-        print("FPS must be a number.")
-        sys.exit(1)
+@click.command()
+@click.option(
+    "--fps", default=30, show_default=True, type=float, help="Frames per second"
+)
+def cli(fps):
+    """Animfetch CLI using SnowyProvider."""
+    fps = constrain(fps, 0, 1000)
     specs = get_fast_fetch_data()
-    script_name = sys.argv[2]
-    params = sys.argv[3:]
-    provider = launch_frame_provider(script_name, params)
+    provider: Provider = SnowyProvider(50, len(specs), fps)
 
+    t0 = t.time()
+    dt = 0.0
+    time_to_wait = 1 / fps
     while True:
-        anim_frame = get_frame(provider)
-        if not anim_frame:
-            break
-        frame = format_frame(anim_frame, specs)
-        print("\033[H\033[J", end="")
-        print("\n".join(frame))
-        time_to_wait = 1 / fps if fps > 0 else 0
-        t.sleep(time_to_wait)
+        dt = t.time() - t0
+        t0 = t.time()
+        provider.update_state(dt)
+
+        time_to_wait -= dt
+        if time_to_wait <= 0:
+            time_to_wait = 1 / fps
+
+            anim_frame = provider.get_frame()
+            if not anim_frame:
+                break
+            frame = format_frame(anim_frame, specs)
+            print("\033[H\033[J", end="")
+            print("\n".join(frame))
 
 
-main()
+if __name__ == "__main__":
+    cli()
