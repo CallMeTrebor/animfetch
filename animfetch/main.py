@@ -1,22 +1,14 @@
 import subprocess
 import time as t
-import sys
-import os
 import click
-
-try:
-    from animfetch.provider import Provider
-    from animfetch.providers.snowy import SnowyProvider
-except ImportError:
-    # Allow running as script from project root
-    from provider import Provider
-    from providers.snowy import SnowyProvider
+from animfetch.provider import Provider
+import os
 
 
-def get_fast_fetch_data():
-    fast_fetch_command = ["fastfetch", "-l", "none", "--pipe", "false"]
-    fast_fetch_data = subprocess.run(fast_fetch_command, capture_output=True, text=True)
-    result = fast_fetch_data.stdout.strip().splitlines()
+def get_fetch_data(fetch_command="fastfetch -l none --pipe false"):
+    fetch_command_split = fetch_command.split(" ")
+    fetch_data = subprocess.run(fetch_command_split, capture_output=True, text=True)
+    result = fetch_data.stdout.strip().splitlines()
     return result
 
 
@@ -47,29 +39,69 @@ def constrain(value, min_value, max_value):
     return max(min_value, min(max_value, value))
 
 
+def get_provider_choices():
+    providers_dir = os.path.join(os.path.dirname(__file__), "providers")
+    choices = []
+    for fname in os.listdir(providers_dir):
+        if fname.endswith(".py") and not fname.startswith("__"):
+            choices.append(fname[:-3])
+    return choices
+
+
 @click.command()
 @click.option(
     "--fps", default=30, show_default=True, type=float, help="Frames per second"
 )
-def cli(fps):
-    """Animfetch CLI using SnowyProvider."""
+@click.option(
+    "--width", default=50, show_default=True, type=int, help="Width of the animation"
+)
+@click.option("--height", default=-1, type=int, help="Height of the animation")
+@click.option(
+    "--provider",
+    default=get_provider_choices()[0],
+    type=click.Choice(get_provider_choices(), case_sensitive=False),
+    help="Animation provider to use",
+)
+@click.option(
+    "--fetch-command",
+    default="fastfetch -l none --pipe false",
+    show_default=True,
+    type=str,
+    help="Command to fetch system information",
+)
+def cli(fps, width, height, provider, fetch_command):
+    """Animfetch CLI using selected provider."""
     fps = constrain(fps, 0, 1000)
-    specs = get_fast_fetch_data()
-    provider: Provider = SnowyProvider(50, len(specs), fps)
+    specs = get_fetch_data(fetch_command)
+
+    # Dynamically import the selected provider
+    provider_module = __import__(
+        f"animfetch.providers.{provider}", fromlist=["Provider"]
+    )
+    ProviderClass = getattr(provider_module, f"{provider.capitalize()}Provider")
+    provider_instance: Provider = ProviderClass(
+        width, len(specs) if height == -1 else height, fps
+    )
 
     t0 = t.time()
     dt = 0.0
-    time_to_wait = 1 / fps
+    frame_wait_time = 1 / fps
+    fetch_wait_time = 5.0  # seconds
     while True:
         dt = t.time() - t0
         t0 = t.time()
-        provider.update_state(dt)
+        provider_instance.update_state(dt)
 
-        time_to_wait -= dt
-        if time_to_wait <= 0:
-            time_to_wait = 1 / fps
+        fetch_wait_time -= dt
+        if fetch_wait_time <= 0:
+            fetch_wait_time = 5.0
+            specs = get_fetch_data(fetch_command)
 
-            anim_frame = provider.get_frame()
+        frame_wait_time -= dt
+        if frame_wait_time <= 0:
+            frame_wait_time = 1 / fps
+
+            anim_frame = provider_instance.get_frame()
             if not anim_frame:
                 break
             frame = format_frame(anim_frame, specs)

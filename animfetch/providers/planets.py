@@ -65,17 +65,20 @@ def update_stars(
             if 0 <= x < width and 0 <= y < height:
                 frame[y][x] = " "
 
-    star_data = new_star_data
-    return frame
+    return frame, new_star_data
 
 
 def update_state(frame, width, height, star_data, planet_data, delta_time: float = 0):
-    return update_planets(
-        update_stars(frame, width, height, star_data, delta_time),
-        width,
-        height,
-        planet_data,
-        delta_time,
+    frame, star_data = update_stars(frame, width, height, star_data, delta_time)
+    return (
+        update_planets(
+            frame,
+            width,
+            height,
+            planet_data,
+            delta_time,
+        ),
+        star_data,
     )
 
 
@@ -99,7 +102,7 @@ class PlanetsProvider(Provider):
 
     def update_state(self, delta_time: float = 0):
         self.frame = [[" " for _ in range(self.width)] for _ in range(self.height)]
-        self.frame = update_state(
+        self.frame, self.star_data = update_state(
             self.frame,
             self.width,
             self.height,
@@ -111,3 +114,6 @@ class PlanetsProvider(Provider):
     def clear(self):
         if self.is_tty:
             print("\033[H\033[J", end="")
+
+    def get_description(self) -> str:
+        return "Planets animation with twinkling stars"
