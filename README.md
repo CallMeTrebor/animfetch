@@ -27,7 +27,7 @@ Alternatively, install locally with pip:
 python -m pip install .
 ```
 
-After installation the `animfetch` command will be available.
+After installation, the `animfetch` command will be available.
 
 ## Usage
 
@@ -57,7 +57,7 @@ animfetch run --fetch-command "neofetch --off"
 
 ## Creating your own provider
 
-Drop a `.py` file in the `providers/` folder (for example `providers/myprovider.py`).
+Drop a `.py` file in the `providers/` folder (for example, `providers/myprovider.py`).
 
 Your provider must implement the `Provider` interface defined in `animfetch/provider.py`. In short, implement a class named `<filename.capitalize()>Provider` that subclasses `Provider` and implements these methods:
 
@@ -97,3 +97,8 @@ That's it — the CLI will discover the new file automatically and list it via `
 
 - The CLI defaults to using `fastfetch` to fetch system specs. If you don't have `fastfetch`, either install it or pass another command via `--fetch-command`.
 - Providers should be named with a `.py` filename and not start with `__` to be auto-discovered.
+- For the time being, the tool was extensively tested only on Linux. If you encounter any problems, feel free to open an issue.
+
+## Contributing
+
+Before contributing, please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening pull requests.
