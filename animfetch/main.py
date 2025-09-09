@@ -119,6 +119,7 @@ def run(fps, width, height, provider, fetch_command):
             frame = format_frame(anim_frame, specs)
             print("\033[H\033[J", end="")
             print("\n".join(frame))
+            t.sleep(max(0, frame_wait_time))
 
 
 @cli.command()
