@@ -13,28 +13,29 @@ namespace py = pybind11;
 // - frame: list[list[str]] (mutated in place)
 // - star_data: list[tuple[int,int,str]]
 // - returns: (same frame object, new star_data list)
+
 static py::tuple updateStars(py::list frame, int width, int height,
-                              py::list star_data, double delta_time = 0.0) {
+                             py::list star_data, double delta_time = 0.0) {
   // Compute max stars (2% of pixels)
-  const int64_t max_stars = static_cast<int64_t>(std::floor(
+  const int64_t maxStars = static_cast<int64_t>(std::floor(
       static_cast<double>(width) * static_cast<double>(height) * 0.02));
 
   // RNG setup
   static thread_local std::mt19937_64 rng{std::random_device{}()};
-  std::uniform_real_distribution<double> urand(0.0, 1.0);
-  std::uniform_int_distribution<int> rand_x(0, std::max(0, width - 1));
-  std::uniform_int_distribution<int> rand_y(0, std::max(0, height - 1));
+  std::uniform_real_distribution<double> uRand(0.0, 1.0);
+  std::uniform_int_distribution<int> randX(0, std::max(0, width - 1));
+  std::uniform_int_distribution<int> randY(0, std::max(0, height - 1));
 
   // Add new star with the same probability logic as Python
-  const double base_star_gen_rate = 0.07;
-  const double star_gen_chance = std::min(
-      base_star_gen_rate * 1.0 / (delta_time + base_star_gen_rate), 1.0);
-  if (static_cast<py::ssize_t>(star_data.size()) < max_stars &&
-      urand(rng) > star_gen_chance) {
-    int x = width > 0 ? rand_x(rng) : 0;
-    int y = height > 0 ? rand_y(rng) : 0;
+  const double baseStarGenRate = 0.07;
+  const double starGenChance =
+      std::min(baseStarGenRate * 1.0 / (delta_time + baseStarGenRate), 1.0);
+  if (static_cast<py::ssize_t>(star_data.size()) < maxStars &&
+      uRand(rng) > starGenChance) {
+    int x = width > 0 ? randX(rng) : 0;
+    int y = height > 0 ? randY(rng) : 0;
     // brightness randomly chosen from [".", "*", "+"]
-    double r = urand(rng);
+    double r = uRand(rng);
     const char *b = ".";
     if (r < 1.0 / 3.0)
       b = ".";
@@ -46,12 +47,12 @@ static py::tuple updateStars(py::list frame, int width, int height,
   }
 
   // Transition probabilities scaled by delta_time
-  const double brighten_rate = 0.25;
-  const double dim_rate = 0.5;
-  const double brighten_chance = std::min(brighten_rate * delta_time, 1.0);
-  const double dim_chance = std::min(dim_rate * delta_time, 1.0);
+  const double brightenRate = 0.25;
+  const double dimRate = 0.5;
+  const double brightenChance = std::min(brightenRate * delta_time, 1.0);
+  const double dimChance = std::min(dimRate * delta_time, 1.0);
 
-  py::list new_star_data;
+  py::list newStarData;
 
   for (py::handle item : star_data) {
     auto tup = py::cast<py::tuple>(item);
@@ -59,31 +60,31 @@ static py::tuple updateStars(py::list frame, int width, int height,
     int y = py::cast<int>(tup[1]);
     std::string brightness = py::cast<std::string>(tup[2]);
 
-    double rv = urand(rng);
-    std::string new_brightness = brightness;
-    if (rv < brighten_chance) {
+    double rv = uRand(rng);
+    std::string newBrightness = brightness;
+    if (rv < brightenChance) {
       if (brightness == ".")
-        new_brightness = "*";
+        newBrightness = "*";
       else if (brightness == "*")
-        new_brightness = "+";
+        newBrightness = "+";
       else
-        new_brightness = "+";
-    } else if (rv < brighten_chance + dim_chance) {
+        newBrightness = "+";
+    } else if (rv < brightenChance + dimChance) {
       if (brightness == "+")
-        new_brightness = "*";
+        newBrightness = "*";
       else if (brightness == "*")
-        new_brightness = ".";
+        newBrightness = ".";
       else
-        new_brightness = "!"; // mark for removal
+        newBrightness = "!"; // mark for removal
     }
 
     // Keep if not marked for removal
-    if (new_brightness != "!") {
-      new_star_data.append(py::make_tuple(x, y, py::str(new_brightness)));
+    if (newBrightness != "!") {
+      newStarData.append(py::make_tuple(x, y, py::str(newBrightness)));
       if (0 <= x && x < width && 0 <= y && y < height) {
         // frame[y][x] = updated_brightness
         py::list row = py::cast<py::list>(frame[y]);
-        row.attr("__setitem__")(x, py::str(new_brightness));
+        row.attr("__setitem__")(x, py::str(newBrightness));
       }
     } else {
       if (0 <= x && x < width && 0 <= y && y < height) {
@@ -94,8 +95,16 @@ static py::tuple updateStars(py::list frame, int width, int height,
   }
 
   py::tuple result(2);
-  result[0] = frame;         // same object, mutated
-  result[1] = new_star_data; // filtered list
+  result[0] = frame;       // same object, mutated
+  result[1] = newStarData; // filtered list
+  return result;
+}
+
+static py::tuple updatePlanets(py::list frame, int width, int height,
+                               py::list planet_data, double delta_time = 0.0) {
+  py::tuple result(2);
+  result[0] = frame;
+  result[1] = planet_data;
   return result;
 }
 
@@ -113,5 +122,19 @@ Args:
   delta_time (float): Seconds since last frame
 Returns:
   tuple[list[list[str]], list[tuple[int,int,str]]]: (frame, new_star_data)
+)pbdoc");
+
+  m.def("update_planets", &updatePlanets, py::arg("frame"), py::arg("width"),
+        py::arg("height"), py::arg("planet_data"), py::arg("delta_time") = 0.0,
+        R"pbdoc(
+Update planets for the Planets animation (placeholder).
+Args:
+  frame (list[list[str]]): The 2D character buffer. Modified in-place.
+  width (int): frame width
+  height (int): frame height
+  planet_data (list): Existing planet data
+  delta_time (float): Seconds since last frame
+Returns:
+  tuple[list[list[str]], list]: (frame, new_planet_data)
 )pbdoc");
 }
