@@ -81,7 +81,14 @@ def cli(ctx):
     type=str,
     help="Command to fetch system information",
 )
-def run(fps, width, height, provider, fetch_command):
+@click.option(
+    "--calculate-frame-time",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Calculate and display the time taken to render frames on average",
+)
+def run(fps, width, height, provider, fetch_command, calculate_frame_time):
     """Run the animation with the selected provider."""
     fps = constrain(fps, 0, 1000)
     specs = get_fetch_data(fetch_command)
@@ -99,6 +106,12 @@ def run(fps, width, height, provider, fetch_command):
     dt = 0.0
     frame_wait_time = 1 / fps
     fetch_wait_time = 5.0  # seconds
+
+    # Frame time measurement state
+    total_render_time = 0.0
+    frames_measured = 0
+    last_render_time = None
+
     while True:
         dt = t.time() - t0
         t0 = t.time()
@@ -113,12 +126,31 @@ def run(fps, width, height, provider, fetch_command):
         if frame_wait_time <= 0:
             frame_wait_time = 1 / fps
 
+            # Start render timer (exclude sleep, include frame generation, formatting, and printing)
+            render_start = t.perf_counter()
+
             anim_frame = provider_instance.get_frame()
             if not anim_frame:
                 break
             frame = format_frame(anim_frame, specs)
             print("\033[H\033[J", end="")
             print("\n".join(frame))
+
+            # Stop render timer right after printing the frame
+            render_time = t.perf_counter() - render_start
+            total_render_time += render_time
+            frames_measured += 1
+            last_render_time = render_time
+
+            # Optionally display frame timing stats (shown for the just-rendered frame)
+            if calculate_frame_time and frames_measured > 0:
+                avg_ms = (total_render_time / frames_measured) * 1000.0
+                last_ms = (
+                    last_render_time * 1000.0 if last_render_time is not None else 0.0
+                )
+                print(
+                    f"[frame-time] last: {last_ms:.2f} ms | avg: {avg_ms:.2f} ms | frames: {frames_measured}"
+                )
             t.sleep(max(0, frame_wait_time))
 
 
