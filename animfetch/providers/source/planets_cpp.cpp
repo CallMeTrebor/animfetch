@@ -13,7 +13,7 @@ namespace py = pybind11;
 // - frame: list[list[str]] (mutated in place)
 // - star_data: list[tuple[int,int,str]]
 // - returns: (same frame object, new star_data list)
-static py::tuple update_stars(py::list frame, int width, int height,
+static py::tuple updateStars(py::list frame, int width, int height,
                               py::list star_data, double delta_time = 0.0) {
   // Compute max stars (2% of pixels)
   const int64_t max_stars = static_cast<int64_t>(std::floor(
@@ -101,7 +101,7 @@ static py::tuple update_stars(py::list frame, int width, int height,
 
 PYBIND11_MODULE(planets_cpp, m) {
   m.doc() = "C++ acceleration for animfetch.providers.planets";
-  m.def("update_stars", &update_stars, py::arg("frame"), py::arg("width"),
+  m.def("update_stars", &updateStars, py::arg("frame"), py::arg("width"),
         py::arg("height"), py::arg("star_data"), py::arg("delta_time") = 0.0,
         R"pbdoc(
 Update stars for the Planets animation.
