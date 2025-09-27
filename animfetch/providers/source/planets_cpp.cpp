@@ -7,13 +7,6 @@
 
 namespace py = pybind11;
 
-// C++ implementation of update_stars mirroring the Python logic in planets.py
-// Signature: (frame, width, height, star_data, delta_time) -> (frame,
-// new_star_data)
-// - frame: list[list[str]] (mutated in place)
-// - star_data: list[tuple[int,int,str]]
-// - returns: (same frame object, new star_data list)
-
 static py::tuple updateStars(py::list frame, int width, int height,
                              py::list star_data, double delta_time = 0.0) {
   // Compute max stars (2% of pixels)
@@ -30,6 +23,7 @@ static py::tuple updateStars(py::list frame, int width, int height,
   const double baseStarGenRate = 0.07;
   const double starGenChance =
       std::min(baseStarGenRate * 1.0 / (delta_time + baseStarGenRate), 1.0);
+      
   if (static_cast<py::ssize_t>(star_data.size()) < maxStars &&
       uRand(rng) > starGenChance) {
     int x = width > 0 ? randX(rng) : 0;
@@ -94,18 +88,12 @@ static py::tuple updateStars(py::list frame, int width, int height,
     }
   }
 
-  py::tuple result(2);
-  result[0] = frame;       // same object, mutated
-  result[1] = newStarData; // filtered list
-  return result;
+  return py::make_tuple(frame, newStarData);
 }
 
 static py::tuple updatePlanets(py::list frame, int width, int height,
                                py::list planet_data, double delta_time = 0.0) {
-  py::tuple result(2);
-  result[0] = frame;
-  result[1] = planet_data;
-  return result;
+  return py::make_tuple(frame, planet_data);
 }
 
 PYBIND11_MODULE(planets_cpp, m) {
