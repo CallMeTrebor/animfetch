@@ -3,6 +3,13 @@ import time as t
 import click
 from animfetch.provider import Provider
 import os
+import re
+
+
+def strip_ansi(text):
+    """Remove ANSI escape codes from text."""
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_escape.sub("", text)
 
 
 def get_fetch_data(fetch_command="fastfetch -l none --pipe false"):
@@ -13,11 +20,21 @@ def get_fetch_data(fetch_command="fastfetch -l none --pipe false"):
 
 
 def format_frame(anim_frame, specs):
-    line_length = max([len(line) for line in anim_frame])
-    anim_frame = [line.center(line_length) for line in anim_frame]
+    line_length = max([len(strip_ansi(line)) for line in anim_frame])
+
+    # Center lines based on visible length
+    centered_frame = []
+    for line in anim_frame:
+        visible_len = len(strip_ansi(line))
+        padding_needed = line_length - visible_len
+        left_pad = padding_needed // 2
+        right_pad = padding_needed - left_pad
+        centered_line = " " * left_pad + line + " " * right_pad
+        centered_frame.append(centered_line)
+
     frame = []
-    for i in range(max(len(anim_frame), len(specs))):
-        anim_line = anim_frame[i] if i < len(anim_frame) else " " * line_length
+    for i in range(max(len(centered_frame), len(specs))):
+        anim_line = centered_frame[i] if i < len(centered_frame) else " " * line_length
         spec_line = specs[i] if i < len(specs) else " " * line_length
         frame.append(anim_line + "  " + spec_line)
     return frame
@@ -81,7 +98,14 @@ def cli(ctx):
     type=str,
     help="Command to fetch system information",
 )
-def run(fps, width, height, provider, fetch_command):
+@click.option(
+    "--calculate-frame-time",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Calculate and display the time taken to render frames on average",
+)
+def run(fps, width, height, provider, fetch_command, calculate_frame_time):
     """Run the animation with the selected provider."""
     fps = constrain(fps, 0, 1000)
     specs = get_fetch_data(fetch_command)
@@ -99,6 +123,12 @@ def run(fps, width, height, provider, fetch_command):
     dt = 0.0
     frame_wait_time = 1 / fps
     fetch_wait_time = 5.0  # seconds
+
+    # Frame time measurement state
+    total_render_time = 0.0
+    frames_measured = 0
+    last_render_time = None
+
     while True:
         dt = t.time() - t0
         t0 = t.time()
@@ -113,13 +143,26 @@ def run(fps, width, height, provider, fetch_command):
         if frame_wait_time <= 0:
             frame_wait_time = 1 / fps
 
+            # Start render timer (exclude sleep, include frame generation, formatting, and printing)
+            render_start = t.perf_counter()
+
             anim_frame = provider_instance.get_frame()
             if not anim_frame:
                 break
             frame = format_frame(anim_frame, specs)
             print("\033[H\033[J", end="")
             print("\n".join(frame))
-            t.sleep(max(0, frame_wait_time))
+
+            # Stop render timer right after printing the frame
+            render_time = t.perf_counter() - render_start
+            total_render_time += render_time
+            frames_measured += 1
+            last_render_time = render_time
+
+            # Optionally display frame timing stats (shown for the just-rendered frame)
+            if calculate_frame_time:
+                avg_ms = (total_render_time / frames_measured) * 1000.0
+                last_ms = last_render_time * 1000.0
 
 
 @cli.command()

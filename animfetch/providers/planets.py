@@ -1,89 +1,140 @@
-from math import floor
+import math
+import platform
+import socket
+import subprocess
 import sys
-import random
 
 from animfetch.provider import Provider
 
+from animfetch.providers.source import planets_cpp as _cpp_mod  # type: ignore
 
-def update_planets(frame, width, height, planet_data, delta_time: float = 0):
-    return frame
+update_stars = _cpp_mod.update_stars  # type: ignore[assignment]
+update_planets = _cpp_mod.update_planets  # type: ignore[assignment]
+Planet = _cpp_mod.Planet  # type: ignore[assignment]
+RGB = _cpp_mod.RGB  # type: ignore[assignment]
+
+# Horizontal stretch factor to compensate for tall terminal characters
+ASPECT_RATIO = 2.0
 
 
-def update_stars(
+class GlobalState:
+    def __init__(self):
+        self.connection_time_passed = 5.0
+        self.connection_status = False
+        self.vpn_check_time_passed = 5.0
+        self.vpn_status = False
+
+
+global_state = GlobalState()
+
+
+def is_connected_to_vpn(delta_time: float = 0) -> bool:
+    """Check if connected to a VPN by looking for VPN network interfaces.
+
+    Supports Linux, macOS, and Windows. Returns False on unsupported platforms.
+    """
+
+    global_state.vpn_check_time_passed += delta_time
+    if global_state.vpn_check_time_passed < 1.0:
+        return global_state.vpn_status
+    global_state.vpn_check_time_passed = 0.0
+
+    system = platform.system()
+
+    try:
+        if system == "Linux":
+            # Linux: use ip command
+            result = subprocess.run(
+                ["ip", "link", "show"], capture_output=True, text=True, timeout=1.0
+            )
+            output = result.stdout.lower()
+            vpn_interfaces = ["tun", "tap", "wg", "ppp", "vpn"]
+            global_state.vpn_status = any(
+                interface in output for interface in vpn_interfaces
+            )
+
+        elif system == "Darwin":  # macOS
+            # macOS: use ifconfig
+            result = subprocess.run(
+                ["ifconfig"], capture_output=True, text=True, timeout=1.0
+            )
+            output = result.stdout.lower()
+            vpn_interfaces = ["utun", "tap", "tun", "ppp", "ipsec"]
+            global_state.vpn_status = any(
+                interface in output for interface in vpn_interfaces
+            )
+
+        elif system == "Windows":
+            # Windows: use ipconfig
+            result = subprocess.run(
+                ["ipconfig"], capture_output=True, text=True, timeout=1.0, shell=True
+            )
+            output = result.stdout.lower()
+            vpn_keywords = ["vpn", "tunnel", "tap-windows", "wintun"]
+            global_state.vpn_status = any(keyword in output for keyword in vpn_keywords)
+
+        else:
+            # Unsupported platform
+            global_state.vpn_status = False
+
+        return global_state.vpn_status
+
+    except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
+        global_state.vpn_status = False
+        return False
+
+
+def is_connected_to_network(delta_time: float = 0) -> bool:
+    global_state.connection_time_passed += delta_time
+    if global_state.connection_time_passed < 1.0:
+        return global_state.connection_status
+    global_state.connection_time_passed = 0.0
+
+    try:
+        # Use DNS port (53) on Google's public DNS server as a lightweight connectivity check.
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.settimeout(0.05)  # Faster timeout
+            sock.connect(("8.8.8.8", 53))
+        global_state.connection_status = True
+        return True
+    except (OSError, socket.error):
+        global_state.connection_status = False
+        return False
+
+
+def update_state(
     frame,
     width,
     height,
     star_data,
+    planet_data,
     delta_time: float = 0,
+    generate_stars: bool = True,
 ):
-    max_stars = floor((width * height) * 0.02)
-
-    # add stars if we have less than max_stars
-    base_star_gen_rate = 0.07
-    star_gen_chance = min(base_star_gen_rate * 1 / (delta_time + base_star_gen_rate), 1)
-    if len(star_data) < max_stars and random.random() > star_gen_chance:
-        x = random.randint(0, width - 1)
-        y = random.randint(0, height - 1)
-        brightness = random.choice([".", "*", "+"])
-        star_data.append((x, y, brightness))
-
-    # update star states with delta_time-scaled probabilities
-    # base rates: brighten 0.25/sec, dim 0.5/sec
-    brighten_rate = 0.25
-    dim_rate = 0.5
-    brighten_chance = min(brighten_rate * delta_time, 1.0)
-    dim_chance = min(dim_rate * delta_time, 1.0)
-
-    new_star_data = []
-    for data in star_data:
-        rand_val = random.random()
-        x, y, brightness = data
-        updated_data = data
-        if rand_val < brighten_chance:
-            if brightness == ".":
-                new_brightness = "*"
-            elif brightness == "*":
-                new_brightness = "+"
-            else:
-                new_brightness = "+"
-            updated_data = (x, y, new_brightness)
-        elif rand_val < brighten_chance + dim_chance:
-            if brightness == "+":
-                new_brightness = "*"
-            elif brightness == "*":
-                new_brightness = "."
-            else:
-                new_brightness = "!"
-            updated_data = (x, y, new_brightness)
-
-        # Only keep stars that are not "!"
-        if updated_data[2] != "!":
-            new_star_data.append(updated_data)
-            if 0 <= x < width and 0 <= y < height:
-                frame[y][x] = updated_data[2]
-        else:
-            if 0 <= x < width and 0 <= y < height:
-                frame[y][x] = " "
-
-    return frame, new_star_data
-
-
-def update_state(frame, width, height, star_data, planet_data, delta_time: float = 0):
-    frame, star_data = update_stars(frame, width, height, star_data, delta_time)
-    return (
-        update_planets(
-            frame,
-            width,
-            height,
-            planet_data,
-            delta_time,
-        ),
-        star_data,
+    frame, star_data = update_stars(
+        frame, width, height, star_data, delta_time, generate_stars
+    )
+    frame, planet_data, color_map = update_planets(
+        frame, width, height, planet_data, delta_time, ASPECT_RATIO
     )
 
+    return (frame, star_data, planet_data, color_map)
 
-def render_frame(frame):
-    return [[char for char in line] for line in frame]
+
+def render_frame(frame, planet_colors):
+    colored_frame = []
+    for y, row in enumerate(frame):
+        colored_row = []
+        for x, char in enumerate(row):
+            if (y, x) in planet_colors:
+                color = planet_colors[(y, x)]
+                # Apply ANSI RGB color code
+                colored_char = f"\033[38;2;{color.r};{color.g};{color.b}m{char}\033[0m"
+                colored_row.append(colored_char)
+            else:
+                colored_row.append(char)
+        colored_frame.append(colored_row)
+    return colored_frame
 
 
 class PlanetsProvider(Provider):
@@ -91,24 +142,48 @@ class PlanetsProvider(Provider):
     def __init__(self, width, height, fps) -> None:
         super().__init__(width, height, fps)
         self.star_data = []
-        self.planet_data = []
+
+        # This is the "Sun" at the center, it would represent you, as in localhost, or the host machine
+        self.sun = Planet(0.1, 0.0, "Sun", RGB(255, 255, 0), False, True)
+
+        # Hardcoded planets, you could define functions to check for certain things and render planets for them too
+        # Like any IOT devices on the network, or bluetooth devices, etc.
+        self.earth = Planet(3.0, 0.0, "Earth", RGB(0, 100, 255))
+        self.mars = Planet(6.0, math.pi / 4, "Mars", RGB(255, 50, 0))
+
+        # This planet is shown when connected to a VPN
+        self.tunnel_planet = Planet(
+            12, 1.25 * math.pi, "TunnelPlanet", RGB(150, 150, 0), False, True
+        )
+        self.planet_data = [self.sun, self.earth, self.mars]
+        self.planet_colors = {}
 
         self.frame = []
         self.is_tty = sys.stdout.isatty()
 
     def get_frame(self) -> list[str] | None:
-        rendered_frame = render_frame(self.frame)
+        rendered_frame = render_frame(self.frame, self.planet_colors)
         return ["".join(line) for line in rendered_frame] + ["\n"]
 
     def update_state(self, delta_time: float = 0):
+        generate_stars = is_connected_to_network(delta_time)
+
+        vpn_connected = is_connected_to_vpn(delta_time)
+        has_tunnel = self.tunnel_planet in self.planet_data
+        if vpn_connected and not has_tunnel:
+            self.planet_data.append(self.tunnel_planet)
+        elif not vpn_connected and has_tunnel:
+            self.planet_data.remove(self.tunnel_planet)
+
         self.frame = [[" " for _ in range(self.width)] for _ in range(self.height)]
-        self.frame, self.star_data = update_state(
+        self.frame, self.star_data, self.planet_data, self.planet_colors = update_state(
             self.frame,
             self.width,
             self.height,
             self.star_data,
             self.planet_data,
             delta_time,
+            generate_stars,
         )
 
     def get_description(self) -> str:
