@@ -23,8 +23,15 @@ vpn_check_time_passed = 5.0  # Check VPN status every second
 vpn_status = False
 
 
-def is_connected_to_vpn() -> bool:
+def is_connected_to_vpn(delta_time: float = 0) -> bool:
     """Check if connected to a VPN by looking for VPN network interfaces."""
+    global vpn_check_time_passed, vpn_status
+
+    vpn_check_time_passed += delta_time
+    if vpn_check_time_passed < 1.0:
+        return vpn_status
+    vpn_check_time_passed = 0.0
+
     try:
         # Check for common VPN interface names
         result = subprocess.run(
@@ -34,8 +41,10 @@ def is_connected_to_vpn() -> bool:
 
         # Common VPN interface names
         vpn_interfaces = ["tun", "tap", "wg", "ppp", "vpn"]
-        return any(interface in output for interface in vpn_interfaces)
+        vpn_status = any(interface in output for interface in vpn_interfaces)
+        return vpn_status
     except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
+        vpn_status = False
         return False
 
 
@@ -45,8 +54,6 @@ def is_connected_to_network(delta_time: float = 0) -> bool:
     connection_time_passed += delta_time
     if connection_time_passed < 1.0:  # Check every second (more responsive)
         return connection_status
-
-    # Reset timer
     connection_time_passed = 0.0
 
     try:
@@ -137,7 +144,6 @@ class PlanetsProvider(Provider):
         )
         self.planet_data = [self.sun, self.earth, self.mars]
         self.planet_colors = {}
-        self.vpn_check_time = 0.0
 
         self.frame = []
         self.is_tty = sys.stdout.isatty()
@@ -149,18 +155,12 @@ class PlanetsProvider(Provider):
     def update_state(self, delta_time: float = 0):
         generate_stars = is_connected_to_network(delta_time)
 
-        # Check VPN status periodically
-        self.vpn_check_time += delta_time
-        if self.vpn_check_time >= 1.0:
-            self.vpn_check_time = 0.0
-            vpn_connected = is_connected_to_vpn()
-
-            # Add or remove tunnel planet based on VPN status
-            has_tunnel = self.tunnel_planet in self.planet_data
-            if vpn_connected and not has_tunnel:
-                self.planet_data.append(self.tunnel_planet)
-            elif not vpn_connected and has_tunnel:
-                self.planet_data.remove(self.tunnel_planet)
+        vpn_connected = is_connected_to_vpn(delta_time)
+        has_tunnel = self.tunnel_planet in self.planet_data
+        if vpn_connected and not has_tunnel:
+            self.planet_data.append(self.tunnel_planet)
+        elif not vpn_connected and has_tunnel:
+            self.planet_data.remove(self.tunnel_planet)
 
         self.frame = [[" " for _ in range(self.width)] for _ in range(self.height)]
         self.frame, self.star_data, self.planet_data, self.planet_colors = update_state(
