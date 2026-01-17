@@ -4,6 +4,9 @@
 #include <cmath>
 #include <random>
 #include <string>
+#include <vector>
+
+#include "planet.hpp"
 
 namespace py = pybind11;
 
@@ -91,13 +94,115 @@ static py::tuple updateStars(py::list frame, int width, int height,
   return py::make_tuple(frame, newStarData);
 }
 
+// Helper function to convert Python list of planet tuples to vector of Planet objects
+static std::vector<Planet> planetsFromPython(py::list planet_list) {
+  std::vector<Planet> planets;
+  planets.reserve(planet_list.size());
+  
+  for (py::handle item : planet_list) {
+    if (py::isinstance<Planet>(item)) {
+      // Already a Planet object
+      planets.push_back(py::cast<Planet>(item));
+    } else if (py::isinstance<py::tuple>(item)) {
+      // Convert from tuple (radius, theta) or (radius, theta, name, color)
+      auto tup = py::cast<py::tuple>(item);
+      double radius = py::cast<double>(tup[0]);
+      double theta = py::cast<double>(tup[1]);
+      
+      if (tup.size() >= 4) {
+        std::string name = py::cast<std::string>(tup[2]);
+        RGB color = py::cast<RGB>(tup[3]);
+        planets.emplace_back(radius, theta, name, color);
+      } else if (tup.size() == 3) {
+        std::string name = py::cast<std::string>(tup[2]);
+        planets.emplace_back(radius, theta, name);
+      } else {
+        planets.emplace_back(radius, theta);
+      }
+    }
+  }
+  
+  return planets;
+}
+
+// Helper function to convert vector of Planet objects to Python list
+static py::list planetsToPython(const std::vector<Planet>& planets) {
+  py::list result;
+  for (const auto& planet : planets) {
+    result.append(planet);
+  }
+  return result;
+}
+
 static py::tuple updatePlanets(py::list frame, int width, int height,
                                py::list planet_data, double delta_time = 0.0) {
-  return py::make_tuple(frame, planet_data);
+
+  // Convert Python list to vector of Planet objects
+  std::vector<Planet> planets = planetsFromPython(planet_data);
+  
+  // Update each planet
+  for (auto& planet : planets) {
+    planet.update(delta_time);
+    
+    // Get planet position in frame coordinates
+    int centerX = width / 2;
+    int centerY = height / 2;
+    
+    int x = centerX + static_cast<int>(std::round(planet.getX()));
+    int y = centerY + static_cast<int>(std::round(planet.getY()));
+    
+    // Draw planet if within bounds
+    if (x >= 0 && x < width && y >= 0 && y < height) {
+      py::list row = py::cast<py::list>(frame[y]);
+      row.attr("__setitem__")(x, py::str("O"));
+    }
+  }
+  
+  // Convert back to Python list
+  py::list new_planet_data = planetsToPython(planets);
+
+  return py::make_tuple(frame, new_planet_data);
 }
 
 PYBIND11_MODULE(planets_cpp, m) {
   m.doc() = "C++ acceleration for animfetch.providers.planets";
+  
+  // Expose RGB struct to Python
+  py::class_<RGB>(m, "RGB")
+    .def(py::init<>(), "Construct RGB with default white color (255, 255, 255)")
+    .def(py::init<int, int, int>(), py::arg("r"), py::arg("g"), py::arg("b"),
+         "Construct RGB with red, green, blue values (0-255)")
+    .def_readwrite("r", &RGB::r, "Red component (0-255)")
+    .def_readwrite("g", &RGB::g, "Green component (0-255)")
+    .def_readwrite("b", &RGB::b, "Blue component (0-255)")
+    .def("__repr__", [](const RGB &c) {
+      return "RGB(" + std::to_string(c.r) + ", " + 
+             std::to_string(c.g) + ", " + std::to_string(c.b) + ")";
+    });
+  
+  // Expose Planet class to Python
+  py::class_<Planet>(m, "Planet")
+    .def(py::init<double, double>(), py::arg("radius"), py::arg("theta"),
+         "Construct a Planet with radius and theta (angle in radians)")
+    .def(py::init<double, double, std::string, RGB>(), 
+         py::arg("radius"), py::arg("theta"), py::arg("name"), py::arg("color"),
+         "Construct a Planet with radius, theta, name, and color")
+    .def("get_radius", &Planet::getRadius, "Get the orbital radius")
+    .def("get_theta", &Planet::getTheta, "Get the current angle in radians")
+    .def("get_x", &Planet::getX, "Get the X coordinate (Cartesian)")
+    .def("get_y", &Planet::getY, "Get the Y coordinate (Cartesian)")
+    .def("get_name", &Planet::getName, "Get the planet name")
+    .def("get_color", &Planet::getColor, "Get the planet color (RGB)")
+    .def("update", &Planet::update, py::arg("delta_time"),
+         "Update planet position based on delta_time")
+    .def("__repr__", [](const Planet &p) {
+      auto color = p.getColor();
+      return "<Planet '" + p.getName() + "' radius=" + std::to_string(p.getRadius()) +
+             " theta=" + std::to_string(p.getTheta()) + 
+             " color=RGB(" + std::to_string(color.r) + ", " + 
+             std::to_string(color.g) + ", " + std::to_string(color.b) + ")>";
+    });
+  
   m.def("update_stars", &updateStars, py::arg("frame"), py::arg("width"),
         py::arg("height"), py::arg("star_data"), py::arg("delta_time") = 0.0,
         R"pbdoc(
@@ -115,14 +220,14 @@ Returns:
   m.def("update_planets", &updatePlanets, py::arg("frame"), py::arg("width"),
         py::arg("height"), py::arg("planet_data"), py::arg("delta_time") = 0.0,
         R"pbdoc(
-Update planets for the Planets animation (placeholder).
+Update planets for the Planets animation.
 Args:
   frame (list[list[str]]): The 2D character buffer. Modified in-place.
   width (int): frame width
   height (int): frame height
-  planet_data (list): Existing planet data
+  planet_data (list): List of Planet objects or tuples (radius, theta)
   delta_time (float): Seconds since last frame
 Returns:
-  tuple[list[list[str]], list]: (frame, new_planet_data)
+  tuple[list[list[str]], list[Planet]]: (frame, updated_planet_list)
 )pbdoc");
 }
