@@ -3,6 +3,13 @@ import time as t
 import click
 from animfetch.provider import Provider
 import os
+import re
+
+
+def strip_ansi(text):
+    """Remove ANSI escape codes from text."""
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    return ansi_escape.sub("", text)
 
 
 def get_fetch_data(fetch_command="fastfetch -l none --pipe false"):
@@ -13,11 +20,21 @@ def get_fetch_data(fetch_command="fastfetch -l none --pipe false"):
 
 
 def format_frame(anim_frame, specs):
-    line_length = max([len(line) for line in anim_frame])
-    anim_frame = [line.center(line_length) for line in anim_frame]
+    line_length = max([len(strip_ansi(line)) for line in anim_frame])
+
+    # Center lines based on visible length
+    centered_frame = []
+    for line in anim_frame:
+        visible_len = len(strip_ansi(line))
+        padding_needed = line_length - visible_len
+        left_pad = padding_needed // 2
+        right_pad = padding_needed - left_pad
+        centered_line = " " * left_pad + line + " " * right_pad
+        centered_frame.append(centered_line)
+
     frame = []
-    for i in range(max(len(anim_frame), len(specs))):
-        anim_line = anim_frame[i] if i < len(anim_frame) else " " * line_length
+    for i in range(max(len(centered_frame), len(specs))):
+        anim_line = centered_frame[i] if i < len(centered_frame) else " " * line_length
         spec_line = specs[i] if i < len(specs) else " " * line_length
         frame.append(anim_line + "  " + spec_line)
     return frame
