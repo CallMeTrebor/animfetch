@@ -136,9 +136,16 @@ class PlanetsProvider(Provider):
     def __init__(self, width, height, fps) -> None:
         super().__init__(width, height, fps)
         self.star_data = []
+
+        # This is the "Sun" at the center, it would represent you, as in localhost, or the host machine
         self.sun = Planet(0.1, 0.0, "Sun", RGB(255, 255, 0), False, True)
+
+        # Hardcoded planets, you could define functions to check for certain things and render planets for them too
+        # Like any IOT devices on the network, or bluethooth devices, etc.
         self.earth = Planet(3.0, 0.0, "Earth", RGB(0, 100, 255))
         self.mars = Planet(6.0, math.pi / 4, "Mars", RGB(255, 50, 0))
+
+        # This planet is shown when connected to a VPN
         self.tunnel_planet = Planet(
             12, 1.25 * math.pi, "TunnelPlanet", RGB(150, 150, 0), False, True
         )
