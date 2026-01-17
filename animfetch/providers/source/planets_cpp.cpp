@@ -188,8 +188,7 @@ static py::tuple updatePlanets(py::list frame, int width, int height,
     // Draw planet if within bounds
     if (x >= 0 && x < width && y >= 0 && y < height) {
       py::list row = py::cast<py::list>(frame[y]);
-      // Use different character for sun (radius ~0) vs planets
-      const char* planetChar = (planet.getRadius() < 0.5) ? "@" : "O";
+      const char* planetChar = planet.getStatic() ? "@" : "O"; // Static planet as '@', others as 'O'
       row.attr("__setitem__")(x, py::str(planetChar));
     }
   }
@@ -228,6 +227,10 @@ PYBIND11_MODULE(planets_cpp, m) {
     .def(py::init<double, double, std::string, RGB, bool>(), 
          py::arg("radius"), py::arg("theta"), py::arg("name"), py::arg("color"), py::arg("show_path"),
          "Construct a Planet with radius, theta, name, color, and path visibility")
+    .def(py::init<double, double, std::string, RGB, bool, bool>(), 
+         py::arg("radius"), py::arg("theta"), py::arg("name"), py::arg("color"), 
+         py::arg("show_path"), py::arg("static"),
+         "Construct a Planet with radius, theta, name, color, path visibility, and static flag")
     .def("get_radius", &Planet::getRadius, "Get the orbital radius")
     .def("get_theta", &Planet::getTheta, "Get the current angle in radians")
     .def("get_x", &Planet::getX, "Get the X coordinate (Cartesian)")
@@ -236,12 +239,14 @@ PYBIND11_MODULE(planets_cpp, m) {
     .def("get_color", &Planet::getColor, "Get the planet color (RGB)")
     .def("get_path_color", &Planet::getPathColor, "Get the darkened path color (RGB)")
     .def("get_show_path", &Planet::getShowPath, "Get whether to show the orbital path")
+    .def("get_static", &Planet::getStatic, "Get whether the planet is static (non-moving)")
     .def("update", &Planet::update, py::arg("delta_time"),
          "Update planet position based on delta_time")
     .def("__repr__", [](const Planet &p) {
       auto color = p.getColor();
       return "<Planet '" + p.getName() + "' radius=" + std::to_string(p.getRadius()) +
              " theta=" + std::to_string(p.getTheta()) + 
+             " static=" + (p.getStatic() ? "true" : "false") +
              " color=RGB(" + std::to_string(color.r) + ", " + 
              std::to_string(color.g) + ", " + std::to_string(color.b) + ")>";
     });

@@ -31,10 +31,11 @@ class Planet {
     std::string m_name;
     RGB m_color;
     bool m_showPath = true;
+    bool m_static = false;
     
 public:
-    Planet(planetPosition_t radius, planetPosition_t theta, std::string name = "", RGB color = RGB(), bool showPath = true)
-        : m_radius(radius), m_theta(theta), m_name(name), m_color(color), m_showPath(showPath) {}
+    Planet(planetPosition_t radius, planetPosition_t theta, std::string name = "", RGB color = RGB(), bool showPath = true, bool staticPlanet = false)
+        : m_radius(radius), m_theta(theta), m_name(name), m_color(color), m_showPath(showPath), m_static(staticPlanet) {}
 
     planetPosition_t getRadius() const { return m_radius; }
     planetPosition_t getTheta() const { return m_theta; }
@@ -44,7 +45,12 @@ public:
     RGB getColor() const { return m_color; }
     RGB getPathColor() const { return m_color.darkened(0.4); }
     bool getShowPath() const { return m_showPath; }
-    void update(planetType_t deltaTime) { m_theta += deltaTime * m_speedFactor; }
+    bool getStatic() const { return m_static; }
+    void update(planetType_t deltaTime) { 
+        if (!m_static) {
+            m_theta += deltaTime * m_speedFactor; 
+        }
+    }
 };
 
 #endif // ANIMFETCH_PLANET_HPP
