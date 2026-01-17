@@ -1,8 +1,7 @@
 from setuptools import setup
 from setuptools import Extension
 from setuptools.command.build_ext import build_ext
-import sys
-import sysconfig
+
 
 try:
     import pybind11  # noqa: F401

@@ -34,8 +34,8 @@ class Planet {
     bool m_static = false;
     
 public:
-    Planet(planetPosition_t radius, planetPosition_t theta, std::string name = "", RGB color = RGB(), bool showPath = true, bool staticPlanet = false)
-        : m_radius(radius), m_theta(theta), m_name(name), m_color(color), m_showPath(showPath), m_static(staticPlanet) {}
+    Planet(planetPosition_t radius, planetPosition_t theta, std::string name = "", RGB color = RGB(), bool showPath = true, bool isStatic = false)
+        : m_radius(radius), m_theta(theta), m_speedFactor(1.0 / radius), m_name(name), m_color(color), m_showPath(showPath), m_static(staticPlanet) {}
 
     planetPosition_t getRadius() const { return m_radius; }
     planetPosition_t getTheta() const { return m_theta; }

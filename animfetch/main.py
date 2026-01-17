@@ -160,15 +160,9 @@ def run(fps, width, height, provider, fetch_command, calculate_frame_time):
             last_render_time = render_time
 
             # Optionally display frame timing stats (shown for the just-rendered frame)
-            if calculate_frame_time and frames_measured > 0:
+            if calculate_frame_time:
                 avg_ms = (total_render_time / frames_measured) * 1000.0
-                last_ms = (
-                    last_render_time * 1000.0 if last_render_time is not None else 0.0
-                )
-                print(
-                    f"[frame-time] last: {last_ms:.2f} ms | avg: {avg_ms:.2f} ms | frames: {frames_measured}"
-                )
-            t.sleep(max(0, frame_wait_time))
+                last_ms = last_render_time * 1000.0
 
 
 @cli.command()

@@ -35,7 +35,7 @@ def is_connected_to_vpn(delta_time: float = 0) -> bool:
     try:
         # Check for common VPN interface names
         result = subprocess.run(
-            ["ip", "link", "show"], capture_output=True, text=True, timeout=0.1
+            ["ip", "link", "show"], capture_output=True, text=True, timeout=1.0
         )
         output = result.stdout.lower()
 
@@ -57,10 +57,10 @@ def is_connected_to_network(delta_time: float = 0) -> bool:
     connection_time_passed = 0.0
 
     try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.settimeout(0.05)  # Faster timeout
-        sock.connect(("8.8.8.8", 80))
-        sock.close()
+        # Use DNS port (53) on Google's public DNS server as a lightweight connectivity check.
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.settimeout(0.05)  # Faster timeout
+            sock.connect(("8.8.8.8", 53))
         connection_status = True
         return True
     except (OSError, socket.error):
@@ -86,8 +86,8 @@ def update_state(
 
     # Build a map of positions to colors (paths and planets)
     color_map = {}
-    centerX = width // 2
-    centerY = height // 2
+    center_x = width // 2
+    center_y = height // 2
 
     # First add path colors (will be overwritten by planet positions)
     for planet in planet_data:
@@ -99,15 +99,15 @@ def update_state(
             )
             for i in range(num_points):
                 angle = (2.0 * math.pi * i) / num_points
-                x = centerX + round(radius * math.cos(angle) * ASPECT_RATIO)
-                y = centerY + round(radius * math.sin(angle))
+                x = center_x + round(radius * math.cos(angle) * ASPECT_RATIO)
+                y = center_y + round(radius * math.sin(angle))
                 if 0 <= x < width and 0 <= y < height:
                     color_map[(y, x)] = path_color
 
     # Then add planet colors (overwrite path positions where planets are)
     for planet in planet_data:
-        x = centerX + round(planet.get_x() * ASPECT_RATIO)
-        y = centerY + round(planet.get_y())
+        x = center_x + round(planet.get_x() * ASPECT_RATIO)
+        y = center_y + round(planet.get_y())
         if 0 <= x < width and 0 <= y < height:
             color = planet.get_color()
             color_map[(y, x)] = color
@@ -141,7 +141,7 @@ class PlanetsProvider(Provider):
         self.sun = Planet(0.1, 0.0, "Sun", RGB(255, 255, 0), False, True)
 
         # Hardcoded planets, you could define functions to check for certain things and render planets for them too
-        # Like any IOT devices on the network, or bluethooth devices, etc.
+        # Like any IOT devices on the network, or bluetooth devices, etc.
         self.earth = Planet(3.0, 0.0, "Earth", RGB(0, 100, 255))
         self.mars = Planet(6.0, math.pi / 4, "Mars", RGB(255, 50, 0))
 

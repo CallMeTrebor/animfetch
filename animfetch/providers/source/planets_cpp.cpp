@@ -116,7 +116,8 @@ static std::vector<Planet> planetsFromPython(py::list planet_list) {
         planets.emplace_back(radius, theta, name, color);
       } else if (tup.size() == 3) {
         std::string name = py::cast<std::string>(tup[2]);
-        planets.emplace_back(radius, theta, name);
+        RGB default_color{};
+        planets.emplace_back(radius, theta, name, default_color);
       } else {
         planets.emplace_back(radius, theta);
       }
