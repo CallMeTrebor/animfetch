@@ -12,7 +12,7 @@
 namespace py = pybind11;
 
 static py::tuple updateStars(py::list frame, int width, int height,
-                             py::list star_data, double delta_time = 0.0) {
+                             py::list star_data, double delta_time = 0.0, bool generate=true) {
   // Compute max stars (2% of pixels)
   const int64_t maxStars = static_cast<int64_t>(std::floor(
       static_cast<double>(width) * static_cast<double>(height) * 0.02));
@@ -28,7 +28,7 @@ static py::tuple updateStars(py::list frame, int width, int height,
   const double starGenChance =
       std::min(baseStarGenRate * 1.0 / (delta_time + baseStarGenRate), 1.0);
       
-  if (static_cast<py::ssize_t>(star_data.size()) < maxStars &&
+  if (generate && static_cast<py::ssize_t>(star_data.size()) < maxStars &&
       uRand(rng) > starGenChance) {
     int x = width > 0 ? randX(rng) : 0;
     int y = height > 0 ? randY(rng) : 0;
@@ -248,6 +248,7 @@ PYBIND11_MODULE(planets_cpp, m) {
   
   m.def("update_stars", &updateStars, py::arg("frame"), py::arg("width"),
         py::arg("height"), py::arg("star_data"), py::arg("delta_time") = 0.0,
+        py::arg("generate") = true,
         R"pbdoc(
 Update stars for the Planets animation.
 Args:
@@ -256,6 +257,7 @@ Args:
   height (int): frame height
   star_data (list[tuple[int,int,str]]): Existing stars
   delta_time (float): Seconds since last frame
+  generate (bool): Whether to generate new stars (default true)
 Returns:
   tuple[list[list[str]], list[tuple[int,int,str]]]: (frame, new_star_data)
 )pbdoc");

@@ -1,4 +1,5 @@
 import math
+import socket
 import sys
 
 from animfetch.provider import Provider
@@ -14,8 +15,44 @@ RGB = _cpp_mod.RGB  # type: ignore[assignment]
 ASPECT_RATIO = 2.0
 
 
-def update_state(frame, width, height, star_data, planet_data, delta_time: float = 0):
-    frame, star_data = update_stars(frame, width, height, star_data, delta_time)
+connection_time_passed = 5.0  # Start at 5.0 to check immediately
+connection_status = False
+
+
+def is_connected_to_network(delta_time: float = 0) -> bool:
+    global connection_time_passed, connection_status
+
+    connection_time_passed += delta_time
+    if connection_time_passed < 1.0:  # Check every second (more responsive)
+        return connection_status
+
+    # Reset timer
+    connection_time_passed = 0.0
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(0.05)  # Faster timeout
+        sock.connect(("8.8.8.8", 80))
+        sock.close()
+        connection_status = True
+        return True
+    except (OSError, socket.error):
+        connection_status = False
+        return False
+
+
+def update_state(
+    frame,
+    width,
+    height,
+    star_data,
+    planet_data,
+    delta_time: float = 0,
+    generate_stars: bool = True,
+):
+    frame, star_data = update_stars(
+        frame, width, height, star_data, delta_time, generate_stars
+    )
     frame, planet_data = update_planets(
         frame, width, height, planet_data, delta_time, ASPECT_RATIO
     )
@@ -86,6 +123,8 @@ class PlanetsProvider(Provider):
         return ["".join(line) for line in rendered_frame] + ["\n"]
 
     def update_state(self, delta_time: float = 0):
+        generate_stars = is_connected_to_network(delta_time)
+
         self.frame = [[" " for _ in range(self.width)] for _ in range(self.height)]
         self.frame, self.star_data, self.planet_data, self.planet_colors = update_state(
             self.frame,
@@ -94,6 +133,7 @@ class PlanetsProvider(Provider):
             self.star_data,
             self.planet_data,
             delta_time,
+            generate_stars,
         )
 
     def get_description(self) -> str:
