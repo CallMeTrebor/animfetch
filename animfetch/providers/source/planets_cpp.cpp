@@ -5,6 +5,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <set>
 
 #include "planet.hpp"
 
@@ -135,26 +136,61 @@ static py::list planetsToPython(const std::vector<Planet>& planets) {
 }
 
 static py::tuple updatePlanets(py::list frame, int width, int height,
-                               py::list planet_data, double delta_time = 0.0) {
+                               py::list planet_data, double delta_time = 0.0,
+                               double aspect_ratio = 2.0) {
 
   // Convert Python list to vector of Planet objects
   std::vector<Planet> planets = planetsFromPython(planet_data);
   
-  // Update each planet
+  int centerX = width / 2;
+  int centerY = height / 2;
+  
+  // Track positions where we draw paths (so planets can overwrite them)
+  std::set<std::pair<int, int>> pathPositions;
+  
+  // First pass: Draw orbital paths
+  for (auto& planet : planets) {
+    if (!planet.getShowPath() || planet.getRadius() < 0.5) continue;
+    
+    double radius = planet.getRadius();
+    RGB pathColor = planet.getPathColor();
+    
+    // Calculate number of points based on circumference (account for stretch)
+    int numPoints = static_cast<int>(std::ceil(2.0 * M_PI * radius * aspect_ratio * 2.0));
+    numPoints = std::max(numPoints, 16); // At least 16 points for smoother ellipse
+    
+    for (int i = 0; i < numPoints; ++i) {
+      double angle = (2.0 * M_PI * i) / numPoints;
+      // Stretch x by aspect_ratio to compensate for tall terminal characters
+      int x = centerX + static_cast<int>(std::round(radius * std::cos(angle) * aspect_ratio));
+      int y = centerY + static_cast<int>(std::round(radius * std::sin(angle)));
+      
+      // Draw path character if within bounds and not already drawn
+      if (x >= 0 && x < width && y >= 0 && y < height) {
+        auto pos = std::make_pair(y, x);
+        if (pathPositions.find(pos) == pathPositions.end()) {
+          pathPositions.insert(pos);
+          py::list row = py::cast<py::list>(frame[y]);
+          row.attr("__setitem__")(x, py::str("."));
+        }
+      }
+    }
+  }
+  
+  // Second pass: Update planets and draw them (on top of paths)
   for (auto& planet : planets) {
     planet.update(delta_time);
     
-    // Get planet position in frame coordinates
-    int centerX = width / 2;
-    int centerY = height / 2;
-    
-    int x = centerX + static_cast<int>(std::round(planet.getX()));
+    // Stretch x by aspect_ratio to compensate for tall terminal characters
+    int x = centerX + static_cast<int>(std::round(planet.getX() * aspect_ratio));
     int y = centerY + static_cast<int>(std::round(planet.getY()));
     
     // Draw planet if within bounds
     if (x >= 0 && x < width && y >= 0 && y < height) {
       py::list row = py::cast<py::list>(frame[y]);
-      row.attr("__setitem__")(x, py::str("O"));
+      // Use different character for sun (radius ~0) vs planets
+      const char* planetChar = (planet.getRadius() < 0.5) ? "@" : "O";
+      row.attr("__setitem__")(x, py::str(planetChar));
     }
   }
   
@@ -175,6 +211,8 @@ PYBIND11_MODULE(planets_cpp, m) {
     .def_readwrite("r", &RGB::r, "Red component (0-255)")
     .def_readwrite("g", &RGB::g, "Green component (0-255)")
     .def_readwrite("b", &RGB::b, "Blue component (0-255)")
+    .def("darkened", &RGB::darkened, py::arg("factor") = 0.4,
+         "Return a darker version of this color")
     .def("__repr__", [](const RGB &c) {
       return "RGB(" + std::to_string(c.r) + ", " + 
              std::to_string(c.g) + ", " + std::to_string(c.b) + ")";
@@ -187,12 +225,17 @@ PYBIND11_MODULE(planets_cpp, m) {
     .def(py::init<double, double, std::string, RGB>(), 
          py::arg("radius"), py::arg("theta"), py::arg("name"), py::arg("color"),
          "Construct a Planet with radius, theta, name, and color")
+    .def(py::init<double, double, std::string, RGB, bool>(), 
+         py::arg("radius"), py::arg("theta"), py::arg("name"), py::arg("color"), py::arg("show_path"),
+         "Construct a Planet with radius, theta, name, color, and path visibility")
     .def("get_radius", &Planet::getRadius, "Get the orbital radius")
     .def("get_theta", &Planet::getTheta, "Get the current angle in radians")
     .def("get_x", &Planet::getX, "Get the X coordinate (Cartesian)")
     .def("get_y", &Planet::getY, "Get the Y coordinate (Cartesian)")
     .def("get_name", &Planet::getName, "Get the planet name")
     .def("get_color", &Planet::getColor, "Get the planet color (RGB)")
+    .def("get_path_color", &Planet::getPathColor, "Get the darkened path color (RGB)")
+    .def("get_show_path", &Planet::getShowPath, "Get whether to show the orbital path")
     .def("update", &Planet::update, py::arg("delta_time"),
          "Update planet position based on delta_time")
     .def("__repr__", [](const Planet &p) {
@@ -219,6 +262,7 @@ Returns:
 
   m.def("update_planets", &updatePlanets, py::arg("frame"), py::arg("width"),
         py::arg("height"), py::arg("planet_data"), py::arg("delta_time") = 0.0,
+        py::arg("aspect_ratio") = 2.0,
         R"pbdoc(
 Update planets for the Planets animation.
 Args:
@@ -227,6 +271,7 @@ Args:
   height (int): frame height
   planet_data (list): List of Planet objects or tuples (radius, theta)
   delta_time (float): Seconds since last frame
+  aspect_ratio (float): Horizontal stretch factor to compensate for tall terminal characters (default 2.0)
 Returns:
   tuple[list[list[str]], list[Planet]]: (frame, updated_planet_list)
 )pbdoc");

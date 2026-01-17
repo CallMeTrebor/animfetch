@@ -11,6 +11,15 @@ struct RGB {
     
     RGB() : r(255), g(255), b(255) {}
     RGB(int red, int green, int blue) : r(red), g(green), b(blue) {}
+    
+    // Return a darker version of this color
+    RGB darkened(double factor = 0.4) const {
+        return RGB(
+            static_cast<int>(r * factor),
+            static_cast<int>(g * factor),
+            static_cast<int>(b * factor)
+        );
+    }
 };
 
 class Planet {
@@ -21,10 +30,11 @@ class Planet {
     planetMoveSpeed_t m_speedFactor = 1 / m_radius;
     std::string m_name;
     RGB m_color;
+    bool m_showPath = true;
     
 public:
-    Planet(planetPosition_t radius, planetPosition_t theta, std::string name = "", RGB color = RGB())
-        : m_radius(radius), m_theta(theta), m_name(name), m_color(color) {}
+    Planet(planetPosition_t radius, planetPosition_t theta, std::string name = "", RGB color = RGB(), bool showPath = true)
+        : m_radius(radius), m_theta(theta), m_name(name), m_color(color), m_showPath(showPath) {}
 
     planetPosition_t getRadius() const { return m_radius; }
     planetPosition_t getTheta() const { return m_theta; }
@@ -32,6 +42,8 @@ public:
     planetPosition_t getY() const { return m_radius * sin(m_theta); }
     std::string getName() const { return m_name; }
     RGB getColor() const { return m_color; }
+    RGB getPathColor() const { return m_color.darkened(0.4); }
+    bool getShowPath() const { return m_showPath; }
     void update(planetType_t deltaTime) { m_theta += deltaTime * m_speedFactor; }
 };
 

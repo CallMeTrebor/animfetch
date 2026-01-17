@@ -1,6 +1,5 @@
-from math import floor
+import math
 import sys
-import random
 
 from animfetch.provider import Provider
 
@@ -11,23 +10,45 @@ update_planets = _cpp_mod.update_planets  # type: ignore[assignment]
 Planet = _cpp_mod.Planet  # type: ignore[assignment]
 RGB = _cpp_mod.RGB  # type: ignore[assignment]
 
+# Horizontal stretch factor to compensate for tall terminal characters
+ASPECT_RATIO = 2.0
+
 
 def update_state(frame, width, height, star_data, planet_data, delta_time: float = 0):
     frame, star_data = update_stars(frame, width, height, star_data, delta_time)
-    frame, planet_data = update_planets(frame, width, height, planet_data, delta_time)
+    frame, planet_data = update_planets(
+        frame, width, height, planet_data, delta_time, ASPECT_RATIO
+    )
 
-    # Build a map of planet positions to colors
-    planet_colors = {}
+    # Build a map of positions to colors (paths and planets)
+    color_map = {}
     centerX = width // 2
     centerY = height // 2
+
+    # First add path colors (will be overwritten by planet positions)
     for planet in planet_data:
-        x = centerX + round(planet.get_x())
+        if planet.get_show_path() and planet.get_radius() >= 0.5:
+            radius = planet.get_radius()
+            path_color = planet.get_path_color()
+            num_points = max(
+                16, int(math.ceil(2.0 * math.pi * radius * ASPECT_RATIO * 2.0))
+            )
+            for i in range(num_points):
+                angle = (2.0 * math.pi * i) / num_points
+                x = centerX + round(radius * math.cos(angle) * ASPECT_RATIO)
+                y = centerY + round(radius * math.sin(angle))
+                if 0 <= x < width and 0 <= y < height:
+                    color_map[(y, x)] = path_color
+
+    # Then add planet colors (overwrite path positions where planets are)
+    for planet in planet_data:
+        x = centerX + round(planet.get_x() * ASPECT_RATIO)
         y = centerY + round(planet.get_y())
         if 0 <= x < width and 0 <= y < height:
             color = planet.get_color()
-            planet_colors[(y, x)] = color
+            color_map[(y, x)] = color
 
-    return (frame, star_data, planet_data, planet_colors)
+    return (frame, star_data, planet_data, color_map)
 
 
 def render_frame(frame, planet_colors):
