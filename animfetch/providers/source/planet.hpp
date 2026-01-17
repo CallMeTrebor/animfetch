@@ -32,7 +32,7 @@ public:
     planetPosition_t getY() const { return m_radius * sin(m_theta); }
     std::string getName() const { return m_name; }
     RGB getColor() const { return m_color; }
-    void update(planetType_t deltaTime) { m_theta += deltaTime * m_speedFactor; } // TODO: adjust speed factor
+    void update(planetType_t deltaTime) { m_theta += deltaTime * m_speedFactor; }
 };
 
 #endif // ANIMFETCH_PLANET_HPP
