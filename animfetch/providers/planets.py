@@ -73,8 +73,9 @@ class PlanetsProvider(Provider):
         super().__init__(width, height, fps)
         self.star_data = []
         sun = Planet(0.1, 0.0, "Sun", RGB(255, 255, 0))
-        earth = Planet(2.0, 0.0, "Earth", RGB(0, 100, 255))
-        self.planet_data = [sun, earth]
+        earth = Planet(3.0, 0.0, "Earth", RGB(0, 100, 255))
+        mars = Planet(6.0, math.pi / 4, "Mars", RGB(255, 50, 0))
+        self.planet_data = [sun, earth, mars]
         self.planet_colors = {}
 
         self.frame = []
