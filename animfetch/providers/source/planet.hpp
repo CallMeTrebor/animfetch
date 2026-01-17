@@ -27,7 +27,7 @@ class Planet {
     using planetMoveSpeed_t = double;
     using planetType_t = float;
     planetPosition_t m_radius = planetPosition_t(10), m_theta = planetPosition_t(0);
-    planetMoveSpeed_t m_speedFactor = 1 / m_radius;
+    planetMoveSpeed_t m_speedFactor;
     std::string m_name;
     RGB m_color;
     bool m_showPath = true;
@@ -35,7 +35,7 @@ class Planet {
     
 public:
     Planet(planetPosition_t radius, planetPosition_t theta, std::string name = "", RGB color = RGB(), bool showPath = true, bool isStatic = false)
-        : m_radius(radius), m_theta(theta), m_speedFactor(1.0 / radius), m_name(name), m_color(color), m_showPath(showPath), m_static(staticPlanet) {}
+        : m_radius(radius), m_theta(theta), m_speedFactor(1.0 / radius), m_name(name), m_color(color), m_showPath(showPath), m_static(isStatic) {}
 
     planetPosition_t getRadius() const { return m_radius; }
     planetPosition_t getTheta() const { return m_theta; }

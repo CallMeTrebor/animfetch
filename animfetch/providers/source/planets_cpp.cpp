@@ -149,7 +149,10 @@ static py::tuple updatePlanets(py::list frame, int width, int height,
   // Track positions where we draw paths (so planets can overwrite them)
   std::set<std::pair<int, int>> pathPositions;
   
-  // First pass: Draw orbital paths
+  // Build color map as we draw paths and planets
+  py::dict color_map;
+  
+  // First pass: Draw orbital paths and add to color map
   for (auto& planet : planets) {
     if (!planet.getShowPath() || planet.getRadius() < 0.5) continue;
     
@@ -173,6 +176,9 @@ static py::tuple updatePlanets(py::list frame, int width, int height,
           pathPositions.insert(pos);
           py::list row = py::cast<py::list>(frame[y]);
           row.attr("__setitem__")(x, py::str("."));
+          
+          // Add to color map
+          color_map[py::make_tuple(y, x)] = pathColor;
         }
       }
     }
@@ -191,13 +197,16 @@ static py::tuple updatePlanets(py::list frame, int width, int height,
       py::list row = py::cast<py::list>(frame[y]);
       const char* planetChar = planet.getStatic() ? "@" : "O"; // Static planet as '@', others as 'O'
       row.attr("__setitem__")(x, py::str(planetChar));
+      
+      // Add planet color to map (overwrites path color if present)
+      color_map[py::make_tuple(y, x)] = planet.getColor();
     }
   }
   
   // Convert back to Python list
   py::list new_planet_data = planetsToPython(planets);
 
-  return py::make_tuple(frame, new_planet_data);
+  return py::make_tuple(frame, new_planet_data, color_map);
 }
 
 PYBIND11_MODULE(planets_cpp, m) {

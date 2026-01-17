@@ -1,4 +1,5 @@
 import math
+import platform
 import socket
 import subprocess
 import sys
@@ -16,55 +17,88 @@ RGB = _cpp_mod.RGB  # type: ignore[assignment]
 ASPECT_RATIO = 2.0
 
 
-connection_time_passed = 5.0  # Start at 5.0 to check immediately
-connection_status = False
+class GlobalState:
+    def __init__(self):
+        self.connection_time_passed = 5.0
+        self.connection_status = False
+        self.vpn_check_time_passed = 5.0
+        self.vpn_status = False
 
-vpn_check_time_passed = 5.0  # Check VPN status every second
-vpn_status = False
+
+global_state = GlobalState()
 
 
 def is_connected_to_vpn(delta_time: float = 0) -> bool:
-    """Check if connected to a VPN by looking for VPN network interfaces."""
-    global vpn_check_time_passed, vpn_status
+    """Check if connected to a VPN by looking for VPN network interfaces.
 
-    vpn_check_time_passed += delta_time
-    if vpn_check_time_passed < 1.0:
-        return vpn_status
-    vpn_check_time_passed = 0.0
+    Supports Linux, macOS, and Windows. Returns False on unsupported platforms.
+    """
+
+    global_state.vpn_check_time_passed += delta_time
+    if global_state.vpn_check_time_passed < 1.0:
+        return global_state.vpn_status
+    global_state.vpn_check_time_passed = 0.0
+
+    system = platform.system()
 
     try:
-        # Check for common VPN interface names
-        result = subprocess.run(
-            ["ip", "link", "show"], capture_output=True, text=True, timeout=1.0
-        )
-        output = result.stdout.lower()
+        if system == "Linux":
+            # Linux: use ip command
+            result = subprocess.run(
+                ["ip", "link", "show"], capture_output=True, text=True, timeout=1.0
+            )
+            output = result.stdout.lower()
+            vpn_interfaces = ["tun", "tap", "wg", "ppp", "vpn"]
+            global_state.vpn_status = any(
+                interface in output for interface in vpn_interfaces
+            )
 
-        # Common VPN interface names
-        vpn_interfaces = ["tun", "tap", "wg", "ppp", "vpn"]
-        vpn_status = any(interface in output for interface in vpn_interfaces)
-        return vpn_status
+        elif system == "Darwin":  # macOS
+            # macOS: use ifconfig
+            result = subprocess.run(
+                ["ifconfig"], capture_output=True, text=True, timeout=1.0
+            )
+            output = result.stdout.lower()
+            vpn_interfaces = ["utun", "tap", "tun", "ppp", "ipsec"]
+            global_state.vpn_status = any(
+                interface in output for interface in vpn_interfaces
+            )
+
+        elif system == "Windows":
+            # Windows: use ipconfig
+            result = subprocess.run(
+                ["ipconfig"], capture_output=True, text=True, timeout=1.0, shell=True
+            )
+            output = result.stdout.lower()
+            vpn_keywords = ["vpn", "tunnel", "tap-windows", "wintun"]
+            global_state.vpn_status = any(keyword in output for keyword in vpn_keywords)
+
+        else:
+            # Unsupported platform
+            global_state.vpn_status = False
+
+        return global_state.vpn_status
+
     except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
-        vpn_status = False
+        global_state.vpn_status = False
         return False
 
 
 def is_connected_to_network(delta_time: float = 0) -> bool:
-    global connection_time_passed, connection_status
-
-    connection_time_passed += delta_time
-    if connection_time_passed < 1.0:  # Check every second (more responsive)
-        return connection_status
-    connection_time_passed = 0.0
+    global_state.connection_time_passed += delta_time
+    if global_state.connection_time_passed < 1.0:
+        return global_state.connection_status
+    global_state.connection_time_passed = 0.0
 
     try:
         # Use DNS port (53) on Google's public DNS server as a lightweight connectivity check.
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.settimeout(0.05)  # Faster timeout
             sock.connect(("8.8.8.8", 53))
-        connection_status = True
+        global_state.connection_status = True
         return True
     except (OSError, socket.error):
-        connection_status = False
+        global_state.connection_status = False
         return False
 
 
@@ -80,37 +114,9 @@ def update_state(
     frame, star_data = update_stars(
         frame, width, height, star_data, delta_time, generate_stars
     )
-    frame, planet_data = update_planets(
+    frame, planet_data, color_map = update_planets(
         frame, width, height, planet_data, delta_time, ASPECT_RATIO
     )
-
-    # Build a map of positions to colors (paths and planets)
-    color_map = {}
-    center_x = width // 2
-    center_y = height // 2
-
-    # First add path colors (will be overwritten by planet positions)
-    for planet in planet_data:
-        if planet.get_show_path() and planet.get_radius() >= 0.5:
-            radius = planet.get_radius()
-            path_color = planet.get_path_color()
-            num_points = max(
-                16, int(math.ceil(2.0 * math.pi * radius * ASPECT_RATIO * 2.0))
-            )
-            for i in range(num_points):
-                angle = (2.0 * math.pi * i) / num_points
-                x = center_x + round(radius * math.cos(angle) * ASPECT_RATIO)
-                y = center_y + round(radius * math.sin(angle))
-                if 0 <= x < width and 0 <= y < height:
-                    color_map[(y, x)] = path_color
-
-    # Then add planet colors (overwrite path positions where planets are)
-    for planet in planet_data:
-        x = center_x + round(planet.get_x() * ASPECT_RATIO)
-        y = center_y + round(planet.get_y())
-        if 0 <= x < width and 0 <= y < height:
-            color = planet.get_color()
-            color_map[(y, x)] = color
 
     return (frame, star_data, planet_data, color_map)
 
